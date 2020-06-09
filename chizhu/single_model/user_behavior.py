@@ -16,11 +16,12 @@ from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.feature_extraction.text import CountVectorizer
 # %matplotlib inline
 from config import path
+
 #add
 import gc
 
 packtime = pd.read_table(path+'deviceid_package_start_close.tsv',
-                         names=['device_id', 'app', 'start', 'close'], low_memory=True)
+                         names=['device_id', 'app', 'start', 'close'], low_memory=True)[:10000]
 # packtime.head()
 packtime['peroid'] = (packtime['close'] - packtime['start'])/1000
 packtime['start'] = pd.to_datetime(packtime['start'], unit='ms')
@@ -36,28 +37,26 @@ packtime['dayofweek'] = packtime['start'].dt.dayofweek
 #packtime['hour'] = pd.cut(packtime['hour'], bins=4).cat.codes
 
 #平均每天使用设备时间
-dtime = packtime.groupby(['device_id', 'date'])['peroid'].agg('sum')
+dtime = packtime.groupby(['device_id', 'date']).agg({'peroid':'sum'})
 #不同时间段占比
-qtime = packtime.groupby(['device_id', 'hour'])['peroid'].agg('sum')
-wtime = packtime.groupby(['device_id', 'dayofweek'])['peroid'].agg('sum')
-atime = packtime.groupby(['device_id', 'app'])['peroid'].agg('sum')
+qtime = packtime.groupby(['device_id', 'hour']).agg({'peroid':'sum'})
+wtime = packtime.groupby(['device_id', 'dayofweek']).agg({'peroid':'sum'})
+atime = packtime.groupby(['device_id', 'app']).agg({'peroid':'sum'})
 
 
 dapp = packtime[['device_id', 'date', 'app']].drop_duplicates().groupby(
-    ['device_id', 'date'])['app'].agg(' '.join)
+    ['device_id', 'date']).agg({'app':' '.join})
 dapp = dapp.reset_index()
 dapp['app_len'] = dapp['app'].apply(lambda x: x.split(' ')).apply(len)
-dapp_stat = dapp.groupby('device_id')['app_len'].agg(
-    {'std': 'std', 'mean': 'mean', 'max': 'max'})
+dapp_stat = dapp.groupby('device_id').app_len.agg(app_len_std='std', app_len_mean= 'mean', app_len_max= 'max')
 dapp_stat = dapp_stat.reset_index()
-dapp_stat.columns = ['device_id', 'app_len_std', 'app_len_mean', 'app_len_max']
 # dapp_stat.head()
 
 dtime = dtime.reset_index()
-dtime_stat = dtime.groupby(['device_id'])['peroid'].agg(
-    {'sum': 'sum', 'mean': 'mean', 'std': 'std', 'max': 'max'}).reset_index()
-dtime_stat.columns = ['device_id', 'date_sum',
-                      'date_mean', 'date_std', 'date_max']
+dtime_stat = dtime.groupby(['device_id']).peroid.agg(
+    date_sum= 'sum', date_mean= 'mean', date_std= 'std', date_max= 'max').reset_index()
+# dtime_stat.columns = ['device_id', 'date_sum',
+#                       'date_mean', 'date_std', 'date_max']
 # dtime_stat.head()
 
 qtime = qtime.reset_index()
@@ -97,15 +96,14 @@ atime['app_cat_enc'] = atime['app'].map(app_cat['cat_enc']).fillna(45)
 
 cat_num = atime.groupby(['device_id', 'app_cat_enc'])[
     'app'].agg('count').reset_index()
-cat_time = atime.groupby(['device_id', 'app_cat_enc'])[
-    'peroid'].agg('sum').reset_index()
+cat_time = atime.groupby(['device_id', 'app_cat_enc']).peroid.agg('sum').reset_index()
 
 app_cat_num = cat_num.pivot(
     index='device_id', columns='app_cat_enc', values='app').fillna(0)
-app_cat_num.columns = ['cat%s' % i for i in range(46)]
+app_cat_num.columns = ['cat%s' % i for i in range(16)]
 app_cat_time = cat_time.pivot(
     index='device_id', columns='app_cat_enc', values='peroid').fillna(0)
-app_cat_time.columns = ['time%s' % i for i in range(46)]
+app_cat_time.columns = ['time%s' % i for i in range(16)]
 
 user = pd.merge(user, app_cat_num, on='device_id', how='left')
 user = pd.merge(user, app_cat_time, on='device_id', how='left')

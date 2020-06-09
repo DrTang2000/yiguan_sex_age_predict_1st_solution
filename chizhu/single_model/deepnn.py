@@ -11,25 +11,30 @@ import time
 from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.feature_extraction.text import CountVectorizer
 # %matplotlib inline
-
+from tensorflow.python.training.adam import AdamOptimizer
+# from tensorflow_addons.optimizers import AdamW
 #add
-from category_encoders import OrdinalEncoder
+# from category_encoders import OrdinalEncoder
 from sklearn.feature_extraction.text import TfidfVectorizer
 from scipy.sparse import hstack
 from sklearn.model_selection import StratifiedKFold
 from sklearn.model_selection import cross_val_score
 from gensim.models import FastText, Word2Vec
 import re
-from keras.layers import *
-from keras.models import *
-from keras.preprocessing.text import Tokenizer, text_to_word_sequence
-from keras.preprocessing.sequence import pad_sequences
+import tensorflow as tf
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras import *
+from tensorflow.keras.layers import *
+from tensorflow.keras.models import *
+from tensorflow.keras.preprocessing.text import Tokenizer, text_to_word_sequence
+from tensorflow.keras.preprocessing.sequence import pad_sequences
 from keras.preprocessing import text, sequence
-from keras.callbacks import *
+from tensorflow.keras.callbacks import *
 from keras.layers.advanced_activations import LeakyReLU, PReLU
-import keras.backend as K
-from keras.optimizers import *
-from keras.utils import to_categorical
+import tensorflow.keras.backend as K
+from tensorflow.keras.optimizers import *
+from tensorflow.keras.utils import to_categorical
+from config import path
 
 packages = pd.read_csv(path+'deviceid_packages.tsv',
                        sep='\t', names=['device_id', 'apps'])
@@ -45,6 +50,7 @@ behave = pd.read_csv('data/user_behavior.csv')
 packages['app_lenghth'] = packages['apps'].apply(
     lambda x: x.split(',')).apply(lambda x: len(x))
 packages['app_list'] = packages['apps'].apply(lambda x: x.split(','))
+
 train = pd.merge(train, packages, on='device_id', how='left')
 test = pd.merge(test, packages, on='device_id', how='left')
 
@@ -78,72 +84,70 @@ for word in tokenizer.word_index:
         continue
     embedding_matrix[tokenizer.word_index[word]] = fastmodel[word]
 
-
-class AdamW(Optimizer):
-    def __init__(self, lr=0.001, beta_1=0.9, beta_2=0.999, weight_decay=1e-4,  # decoupled weight decay (1/4)
-                 epsilon=1e-8, decay=0., **kwargs):
-        super(AdamW, self).__init__(**kwargs)
-        with K.name_scope(self.__class__.__name__):
-            self.iterations = K.variable(0, dtype='int64', name='iterations')
-            self.lr = K.variable(lr, name='lr')
-            self.beta_1 = K.variable(beta_1, name='beta_1')
-            self.beta_2 = K.variable(beta_2, name='beta_2')
-            self.decay = K.variable(decay, name='decay')
-            # decoupled weight decay (2/4)
-            self.wd = K.variable(weight_decay, name='weight_decay')
-        self.epsilon = epsilon
-        self.initial_decay = decay
-
-    @interfaces.legacy_get_updates_support
-    def get_updates(self, loss, params):
-        grads = self.get_gradients(loss, params)
-        self.updates = [K.update_add(self.iterations, 1)]
-        wd = self.wd  # decoupled weight decay (3/4)
-
-        lr = self.lr
-        if self.initial_decay > 0:
-            lr *= (1. / (1. + self.decay * K.cast(self.iterations,
-                                                  K.dtype(self.decay))))
-
-        t = K.cast(self.iterations, K.floatx()) + 1
-        lr_t = lr * (K.sqrt(1. - K.pow(self.beta_2, t)) /
-                     (1. - K.pow(self.beta_1, t)))
-
-        ms = [K.zeros(K.int_shape(p), dtype=K.dtype(p)) for p in params]
-        vs = [K.zeros(K.int_shape(p), dtype=K.dtype(p)) for p in params]
-        self.weights = [self.iterations] + ms + vs
-
-        for p, g, m, v in zip(params, grads, ms, vs):
-            m_t = (self.beta_1 * m) + (1. - self.beta_1) * g
-            v_t = (self.beta_2 * v) + (1. - self.beta_2) * K.square(g)
-            # decoupled weight decay (4/4)
-            p_t = p - lr_t * m_t / (K.sqrt(v_t) + self.epsilon) - lr * wd * p
-
-            self.updates.append(K.update(m, m_t))
-            self.updates.append(K.update(v, v_t))
-            new_p = p_t
-
-            # Apply constraints.
-            if getattr(p, 'constraint', None) is not None:
-                new_p = p.constraint(new_p)
-
-            self.updates.append(K.update(p, new_p))
-        return self.updates
-
-    def get_config(self):
-        config = {'lr': float(K.get_value(self.lr)),
-                  'beta_1': float(K.get_value(self.beta_1)),
-                  'beta_2': float(K.get_value(self.beta_2)),
-                  'decay': float(K.get_value(self.decay)),
-                  'weight_decay': float(K.get_value(self.wd)),
-                  'epsilon': self.epsilon}
-        base_config = super(AdamW, self).get_config()
-        return dict(list(base_config.items()) + list(config.items()))
+# class Adam(Optimizer):
+#     def __init__(self, learning_rate=0.001, beta_1=0.9, beta_2=0.999, weight_decay=1e-4,  # decoupled weight decay (1/4)
+#                  epsilon=1e-8, decay=0., **kwargs):
+#         super(Adam, self).__init__(self, **kwargs)
+#         with K.name_scope(self.__class__.__name__):
+#             self.iterations = K.variable(0, dtype='int64', name='iterations')
+#             self.lr = K.variable(learning_rate, name='learning_rate')
+#             self.beta_1 = K.variable(beta_1, name='beta_1')
+#             self.beta_2 = K.variable(beta_2, name='beta_2')
+#             self.decay = K.variable(decay, name='decay')
+#             # decoupled weight decay (2/4)
+#             self.wd = K.variable(weight_decay, name='weight_decay')
+#         self.epsilon = epsilon
+#         self.initial_decay = decay
+#
+#     def get_updates(self, loss, params):
+#         grads = self.get_gradients(loss, params)
+#         self.updates = [K.update_add(self.iterations, 1)]
+#         wd = self.wd  # decoupled weight decay (3/4)
+#
+#         lr = self.lr()
+#         if self.initial_decay > 0:
+#             lr *= (1. / (1. + self.decay * K.cast(self.iterations,
+#                                                   K.dtype(self.decay))))
+#
+#         t = K.cast(self.iterations, K.floatx()) + 1
+#         lr_t = lr * (K.sqrt(1. - K.pow(self.beta_2, t)) /
+#                      (1. - K.pow(self.beta_1, t)))
+#
+#         ms = [K.zeros(K.int_shape(p), dtype=K.dtype(p)) for p in params]
+#         vs = [K.zeros(K.int_shape(p), dtype=K.dtype(p)) for p in params]
+#         self.weights = [self.iterations] + ms + vs
+#
+#         for p, g, m, v in zip(params, grads, ms, vs):
+#             m_t = (self.beta_1 * m) + (1. - self.beta_1) * g
+#             v_t = (self.beta_2 * v) + (1. - self.beta_2) * K.square(g)
+#             # decoupled weight decay (4/4)
+#             p_t = p - lr_t * m_t / (K.sqrt(v_t) + self.epsilon) - lr * wd * p
+#
+#             self.updates.append(K.update(m, m_t))
+#             self.updates.append(K.update(v, v_t))
+#             new_p = p_t
+#
+#             # Apply constraints.
+#             if getattr(p, 'constraint', None) is not None:
+#                 new_p = p.constraint(new_p)
+#
+#             self.updates.append(K.update(p, new_p))
+#         return self.updates
+#
+#     def get_config(self):
+#         config = {'learning_rate': float(K.get_value(self.lr)),
+#                   'beta_1': float(K.get_value(self.beta_1)),
+#                   'beta_2': float(K.get_value(self.beta_2)),
+#                   'decay': float(K.get_value(self.decay)),
+#                   'weight_decay': float(K.get_value(self.wd)),
+#                   'epsilon': self.epsilon}
+#         base_config = super(Adam, self).get_config()
+#         return dict(list(base_config.items()) + list(config.items()))
 
 
 def model_conv1D_sex(embedding_matrix):
 
-    K.clear_session()
+    # K.clear_session()
     # The embedding layer containing the word vectors
     emb_layer = Embedding(
         input_dim=embedding_matrix.shape[0],
@@ -240,7 +244,7 @@ def model_conv1D_sex(embedding_matrix):
     # model = Model(inputs=[seq1, seq2, magic_input, distance_input], outputs=pred)
     model = Model(inputs=seq, outputs=pred)
     model.compile(loss='binary_crossentropy',
-                  optimizer=AdamW(weight_decay=0.1,))
+                  optimizer=Adam())
 
     return model
 
@@ -263,7 +267,7 @@ for i, (train_index, test_index) in enumerate(kfold.split(X, Y_sex)):
 
     model_sex = model_conv1D_sex(embedding_matrix)
     X_tr, X_vl, y_tr, y_vl = X[train_index], X[test_index], Y_sex[train_index], Y_sex[test_index]
-    hist = model_sex.fit(X_tr, y_tr, batch_size=512, epochs=50, validation_data=(X_vl, y_vl),
+    hist = model_sex.fit(X_tr, y_tr.to_numpy(), batch_size=512, epochs=50, validation_data=(X_vl, y_vl.to_numpy()),
                          callbacks=callbacks, verbose=2, shuffle=True)
     model_sex.load_weights(filepath)
     sub1 += np.squeeze(model_sex.predict(X_test))/kfold.n_splits
@@ -281,7 +285,7 @@ res1['sex1'] = 1-res1['sex2']
 
 def model_age_conv(embedding_matrix):
 
-    K.clear_session()
+    # K.clear_session()
     # The embedding layer containing the word vectors
     emb_layer = Embedding(
         input_dim=embedding_matrix.shape[0],
@@ -377,7 +381,7 @@ def model_age_conv(embedding_matrix):
 
     model = Model(inputs=seq, outputs=pred)
     model.compile(loss='categorical_crossentropy',
-                  optimizer=AdamW(weight_decay=0.1,))
+                  optimizer=Adam())
 
     return model
 

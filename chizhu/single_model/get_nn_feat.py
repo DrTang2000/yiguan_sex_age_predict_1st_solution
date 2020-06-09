@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import time
 from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.feature_extraction.text import CountVectorizer
-%matplotlib inline
+# %matplotlib inline
 
 #add
 import gc
