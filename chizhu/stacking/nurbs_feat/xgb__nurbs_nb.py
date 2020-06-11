@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import time
 from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.feature_extraction.text import CountVectorizer
-get_ipython().run_line_magic('matplotlib', 'inline')
+# get_ipython().run_line_magic('matplotlib', 'inline')
 
 #add
 import gc
@@ -193,9 +193,9 @@ Y = train['age']
 import lightgbm as lgb
 import xgboost as xgb
 from sklearn.metrics import auc, log_loss, roc_auc_score,f1_score,recall_score,precision_score
-from sklearn.cross_validation import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold
 
-kf = StratifiedKFold(Y, n_folds=10, shuffle=True, random_state=1024)
+kf = StratifiedKFold(Y, n_splits=10, shuffle=True, random_state=1024)
 params={
 	'booster':'gbtree',
      "tree_method":"gpu_hist",

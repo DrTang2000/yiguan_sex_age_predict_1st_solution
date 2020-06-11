@@ -88,9 +88,9 @@ Y_CAT=pd.Categorical(train[label])
 import lightgbm as lgb
 import xgboost as xgb
 from sklearn.metrics import auc, log_loss, roc_auc_score,f1_score,recall_score,precision_score
-from sklearn.cross_validation import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold
 
-kf = StratifiedKFold(Y_CAT, n_folds=5, shuffle=True, random_state=1024)
+kf = StratifiedKFold(Y_CAT, n_splits=5, shuffle=True, random_state=1024)
 params={
 	'booster':'gbtree',
      "tree_method":"gpu_hist",
